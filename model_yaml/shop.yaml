@@ -1,0 +1,22 @@
+name: Shop
+fields:
+  - name: name
+    type: string
+    required: true       # adds binding:"required" in Go, .min(1) in Zod
+    unique: true         # adds gorm:"uniqueIndex"
+  - name: description
+    type: text           # maps to gorm:"type:text", optional by default
+  - name: country
+    type: belongs_to
+    model: Country
+  - name: state
+    type: belongs_to
+    model: State
+    required: true       # adds binding:"required" in Go, .min(1) in Zod
+  - name: city
+    type: string
+    required: true       # adds binding:"required" in Go, .min(1) in Zod
+  - name: isPublished
+    type: bool
+    default: "false"     # adds gorm:"default:false"
+  

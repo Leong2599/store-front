@@ -57,5 +57,19 @@ export const API_ROUTES = {
     DELETE: (id: string) => `/api/admin/blogs/${id}`,
   },
   HEALTH: "/api/health",
+  COUNTRIES: {
+    LIST: "/api/countries",
+    GET: (id: number) => `/api/countries/${id}`,
+    CREATE: "/api/countries",
+    UPDATE: (id: number) => `/api/countries/${id}`,
+    DELETE: (id: number) => `/api/countries/${id}`,
+  },
+  STATES: {
+    LIST: "/api/states",
+    GET: (id: number) => `/api/states/${id}`,
+    CREATE: "/api/states",
+    UPDATE: (id: number) => `/api/states/${id}`,
+    DELETE: (id: number) => `/api/states/${id}`,
+  },
   // grit:api-routes
 } as const;

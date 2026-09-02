@@ -118,6 +118,34 @@ func coreModules() []Module {
 func generatedModules() []Module {
 	return []Module{
 		// grit:perms:auto-start
+		{
+			Key:  "countries",
+			Name: "Countries",
+			Groups: []Group{
+				{
+					Key:  "countries",
+					Name: "Countries",
+					Features: []Feature{
+						{Key: "countries", Name: "Countries", Actions: AllActions},
+					},
+				},
+			},
+		},
+
+		{
+			Key:  "states",
+			Name: "States",
+			Groups: []Group{
+				{
+					Key:  "states",
+					Name: "States",
+					Features: []Feature{
+						{Key: "states", Name: "States", Actions: AllActions},
+					},
+				},
+			},
+		},
+
 		// grit:perms:auto-end
 	}
 }

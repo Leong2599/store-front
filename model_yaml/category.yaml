@@ -1,0 +1,17 @@
+name: Category
+fields:
+  - name: name
+    type: string
+    required: true       # adds binding:"required" in Go, .min(1) in Zod
+    unique: true         # adds gorm:"uniqueIndex"
+  - name: slug
+    type: string
+    required: true       # adds binding:"required" in Go, .min(1) in Zod
+    unique: true         # adds gorm:"uniqueIndex"
+  - name: description
+    type: text           # maps to gorm:"type:text", optional by default
+#belongsTo:
+ # - name: parent
+  #  model: Category
+   # foreignKey: parent_id
+    #onDelete: SET NULL

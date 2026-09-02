@@ -1,0 +1,21 @@
+name: Invoice
+fields:
+  - name: number
+    type: string
+    required: true       # adds binding:"required" in Go, .min(1) in Zod
+    unique: true         # adds gorm:"uniqueIndex"
+  - name: description
+    type: text           # maps to gorm:"type:text", optional by default
+  - name: amount
+    type: float
+  - name: status
+    type: string
+    default: "pending"   # adds gorm:"default:pending"
+  - name: quantity
+    type: uint           # unsigned integer, z.number().int().nonnegative()
+  - name: due_date
+    type: date           # maps to *time.Time, gorm:"type:date"
+  - name: paid
+    type: bool
+    default: "false"     # adds gorm:"default:false"
+

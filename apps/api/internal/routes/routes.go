@@ -284,7 +284,7 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 				cfg.GORMStudioUsername: cfg.GORMStudioPassword,
 			})
 		}
-		studio.Mount(r, db, []interface{}{&models.User{}, &models.Upload{}, &models.Blog{} /* grit:studio */}, studioCfg)
+		studio.Mount(r, db, []interface{}{&models.User{}, &models.Upload{}, &models.Blog{}, &models.Country{}, &models.State{}, /* grit:studio */}, studioCfg)
 		log.Println("GORM Studio mounted at /studio")
 	}
 
@@ -430,6 +430,8 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 	syncRegistry.Register("users", &models.User{})
 	syncRegistry.Register("uploads", &models.Upload{})
 	syncRegistry.Register("blogs", &models.Blog{})
+	syncRegistry.Register("countries", &models.Country{})
+	syncRegistry.Register("states", &models.State{})
 	// grit:sync
 	syncHandler := handlers.NewSyncHandler(db, syncRegistry)
 	// v3.31.68 — shared background CSV import status endpoint
@@ -453,6 +455,12 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 		log.Printf("saml: %v", err)
 	}
 	ssoHandler := handlers.NewSSOHandler(db, authService, cfg, ssoRegistry, samlRegistry)
+	countryHandler := &handlers.CountryHandler{
+		DB: db,
+	}
+	stateHandler := &handlers.StateHandler{
+		DB: db,
+	}
 	// grit:handlers
 
 	// Health check
@@ -789,6 +797,24 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 		// v3.31.68 — poll a background CSV import's progress/result.
 		protected.GET("/imports/:id", importJobHandler.GetByID)
 
+		protected.GET("/countries", countryHandler.List)
+		protected.GET("/countries/export", countryHandler.Export)
+		protected.POST("/countries/import", countryHandler.Import)
+		protected.GET("/countries/import/template", countryHandler.Template)
+		protected.GET("/countries/:id", countryHandler.GetByID)
+		protected.GET("/countries/:id/pdf", countryHandler.PDF)
+		protected.POST("/countries", countryHandler.Create)
+		protected.PUT("/countries/:id", countryHandler.Update)
+		protected.PATCH("/countries/:id", countryHandler.Patch)
+		protected.GET("/states", stateHandler.List)
+		protected.GET("/states/export", stateHandler.Export)
+		protected.POST("/states/import", stateHandler.Import)
+		protected.GET("/states/import/template", stateHandler.Template)
+		protected.GET("/states/:id", stateHandler.GetByID)
+		protected.GET("/states/:id/pdf", stateHandler.PDF)
+		protected.POST("/states", stateHandler.Create)
+		protected.PUT("/states/:id", stateHandler.Update)
+		protected.PATCH("/states/:id", stateHandler.Patch)
 		// grit:routes:protected
 	}
 
@@ -929,6 +955,10 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 		admin.PUT("/settings", settingsHandler.Update)
 		admin.DELETE("/settings/:key", settingsHandler.Reset)
 
+		admin.DELETE("/countries/:id", countryHandler.Delete)
+		admin.POST("/countries/bulk", countryHandler.Bulk)
+		admin.DELETE("/states/:id", stateHandler.Delete)
+		admin.POST("/states/bulk", stateHandler.Bulk)
 		// grit:routes:admin
 	}
 

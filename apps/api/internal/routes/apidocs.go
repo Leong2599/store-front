@@ -37,7 +37,7 @@ func registerAPIDocs(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 		// inside this app. They are not your API, and 111 of their routes in
 		// the reference buries the ~140 that are yours.
 		ExcludePrefixes: []string{"/pulse", "/sentinel", "/studio", "/docs"},
-		Models:          []interface{}{&models.User{}, &models.Upload{}, &models.Blog{} /* grit:docs:models */},
+		Models:          []interface{}{&models.User{}, &models.Upload{}, &models.Blog{}, &models.Country{}, &models.State{}, /* grit:docs:models */},
 		Auth: gindocs.AuthConfig{
 			Type:         gindocs.AuthBearer,
 			BearerFormat: "JWT",
@@ -570,6 +570,48 @@ func registerAPIDocs(r *gin.Engine, db *gorm.DB, cfg *config.Config) {
 		Response(401, handlers.ErrorResponse{}, "Signature check failed")
 
 	// grit:docs:routes — "grit generate resource" registers each resource here.
+	docs.Route("GET /api/v1/countries").
+		Summary("List countries").
+		Response(200, []models.Country{}, "A page of countries")
+	docs.Route("POST /api/v1/countries").
+		Summary("Create a country").
+		RequestBody(handlers.CreateCountryRequest{}).
+		Response(201, models.Country{}, "Created").
+		Response(422, handlers.ErrorResponse{}, "Validation failed")
+	docs.Route("GET /api/v1/countries/:id").
+		Summary("Get one country").
+		Response(200, models.Country{}, "The country").
+		Response(404, handlers.ErrorResponse{}, "Not found")
+	docs.Route("PUT /api/v1/countries/:id").
+		Summary("Update a country").
+		RequestBody(handlers.UpdateCountryRequest{}).
+		Response(200, models.Country{}, "Updated").
+		Response(404, handlers.ErrorResponse{}, "Not found")
+	docs.Route("DELETE /api/v1/countries/:id").
+		Summary("Delete a country").
+		Response(204, nil, "Deleted").
+		Response(404, handlers.ErrorResponse{}, "Not found")
+	docs.Route("GET /api/v1/states").
+		Summary("List states").
+		Response(200, []models.State{}, "A page of states")
+	docs.Route("POST /api/v1/states").
+		Summary("Create a state").
+		RequestBody(handlers.CreateStateRequest{}).
+		Response(201, models.State{}, "Created").
+		Response(422, handlers.ErrorResponse{}, "Validation failed")
+	docs.Route("GET /api/v1/states/:id").
+		Summary("Get one state").
+		Response(200, models.State{}, "The state").
+		Response(404, handlers.ErrorResponse{}, "Not found")
+	docs.Route("PUT /api/v1/states/:id").
+		Summary("Update a state").
+		RequestBody(handlers.UpdateStateRequest{}).
+		Response(200, models.State{}, "Updated").
+		Response(404, handlers.ErrorResponse{}, "Not found")
+	docs.Route("DELETE /api/v1/states/:id").
+		Summary("Delete a state").
+		Response(204, nil, "Deleted").
+		Response(404, handlers.ErrorResponse{}, "Not found")
 	// grit:docs:routes:end
 	log.Println("API docs available at /docs")
 }
