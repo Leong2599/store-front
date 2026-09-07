@@ -148,8 +148,9 @@ func Models() []interface{} {
 		// the service provider's own signing keypair, generated on first use
 		&SAMLKeypair{},
 		&Setting{},
-		&Country{},
-		&State{},
+				&Passkey{},
+		&WebAuthnSession{},
+		&OutboxMessage{},
 		// grit:models
 	}
 }

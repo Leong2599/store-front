@@ -57,7 +57,15 @@ type Params struct {
 	SortBy    string
 	SortOrder string
 	Cursor    string // opaque base64 from a previous Result.Meta.NextCursor
-	Filters   map[string]any
+
+	// CursorMode asks for keyset pagination on this request.
+	//
+	// Set by ?mode=cursor, and implied by sending a ?cursor= at all, so a
+	// client that follows meta.next_cursor never has to say so twice. Offset
+	// stays the default because the admin table needs page numbers and a
+	// total, which keyset pagination cannot give you.
+	CursorMode bool
+	Filters    map[string]any
 	// QueryFilters are raw query-string params that are NOT reserved words.
 	// Untrusted: kept apart from Filters (which handlers set in Go) so the
 	// whitelist can be applied to these and only these.
@@ -171,6 +179,15 @@ type Meta struct {
 	Pages      int    `json:"pages"`
 	NextCursor string `json:"next_cursor,omitempty"`
 	HasMore    bool   `json:"has_more,omitempty"`
+
+	// Mode is "cursor" on a keyset response and absent on an offset one.
+	//
+	// It is here because total, page and pages are all zero in cursor mode,
+	// and a client cannot otherwise tell that apart from an empty table. The
+	// counts are zero because counting the whole set on every page is the
+	// cost keyset pagination exists to avoid; ask for it with
+	// Config.IncludeTotal when you genuinely need it.
+	Mode string `json:"mode,omitempty"`
 }
 
 // Result wraps the paginated data in the canonical { data, meta } envelope.
@@ -238,6 +255,7 @@ func Bind(c *gin.Context) Params {
 		SortBy:       c.Query("sort_by"),
 		SortOrder:    c.Query("sort_order"),
 		Cursor:       c.Query("cursor"),
+		CursorMode:   c.Query("mode") == "cursor" || c.Query("cursor") != "",
 		DateField:    dateField,
 		DateFrom:     dateFrom,
 		DateTo:       dateTo,
@@ -252,6 +270,7 @@ var reservedParams = map[string]bool{
 	"page": true, "page_size": true, "search": true,
 	"sort_by": true, "sort_order": true, "cursor": true,
 	"date_field": true, "date_from": true, "date_to": true,
+	"mode":          true,
 	"created_since": true, "created_from": true, "created_to": true,
 	"updated_since": true, "archived": true, "format": true,
 }
@@ -489,7 +508,8 @@ func List[T any](query *gorm.DB, p Params, cfg Config) (Result[T], error) {
 		query = query.Where(clause, args...)
 	}
 
-	if cfg.CursorMode {
+	// Either the handler insists, or the request asked.
+	if cfg.CursorMode || p.CursorMode {
 		return listCursor[T](query, p, cfg, sortBy, sortOrder)
 	}
 
@@ -544,7 +564,13 @@ func listCursor[T any](query *gorm.DB, p Params, cfg Config, sortBy, sortOrder s
 			// Postgres tuple comparison: (sort_col, id) < (val, id).
 			// Works on SQLite too. The id tiebreaker keeps the cursor
 			// stable when sort_value collides on multiple rows.
-			query = query.Where(fmt.Sprintf("(%s, id) %s (?, ?)", sortBy, op), sortVal, lastID)
+			//
+			// typedCursorValue matters more than it looks: handing the raw
+			// string over compares a timestamp column against text, which
+			// SQLite answers true for every row, and page two comes back
+			// identical to page one.
+			query = query.Where(fmt.Sprintf("(%s, id) %s (?, ?)", sortBy, op),
+				typedCursorValue(sortVal), lastID)
 		}
 	}
 
@@ -571,7 +597,34 @@ func listCursor[T any](query *gorm.DB, p Params, cfg Config, sortBy, sortOrder s
 	}
 
 	result.Meta.PageSize = p.PageSize
+	result.Meta.Mode = "cursor"
 	return result, nil
+}
+
+// typedCursorValue turns the cursor's text back into something the column can
+// be compared against.
+//
+// The cursor is text because it travels in a URL, but the column is not: a
+// timestamp compared against a string, or an integer compared against '500',
+// is a different comparison in every database and the wrong one in SQLite.
+// Binding the value at its own type lets the driver do what it does for every
+// other parameter.
+//
+// The order is deliberate. RFC3339 first, because that is what extractCursor
+// writes for a time and it is specific enough not to swallow anything else.
+// Integers before floats, so an id-like value does not become 1.0. A string
+// that is none of those was a string in the column too.
+func typedCursorValue(s string) any {
+	if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
+		return t
+	}
+	if n, err := strconv.ParseInt(s, 10, 64); err == nil {
+		return n
+	}
+	if f, err := strconv.ParseFloat(s, 64); err == nil {
+		return f
+	}
+	return s
 }
 
 // EncodeCursor / DecodeCursor are exported for handlers that build
@@ -613,16 +666,58 @@ func extractCursor(item interface{}, sortBy string) (string, string) {
 	}
 	id := idVal.String()
 
-	goFieldName := snakeToPascal(sortBy)
-	sortField := rv.FieldByName(goFieldName)
+	sortField := lookupSortField(rv, sortBy)
 	if !sortField.IsValid() {
-		return "", id
+		// No field to read means no usable cursor. Returning the id alone
+		// would encode an empty sort value, and the next page would compare
+		// against "" and return the whole table from the top.
+		return "", ""
 	}
 
 	if t, ok := sortField.Interface().(time.Time); ok {
 		return t.Format(time.RFC3339Nano), id
 	}
 	return fmt.Sprintf("%v", sortField.Interface()), id
+}
+
+// lookupSortField finds the struct field behind a column name.
+//
+// Usually that is one field: "created_at" is CreatedAt. An embedded struct is
+// two, because GORM flattens it with a prefix: a money field declared as
+// Price money.Money becomes the columns price_amount and price_currency, and
+// there is no PriceAmount field to find. So a name that does not resolve
+// whole is split at each underscore and tried as a path, longest prefix first,
+// which finds Price then Amount.
+//
+// Getting this wrong is not a crash. FieldByName returns an invalid Value, the
+// cursor encodes an empty sort value, and the next page compares against ""
+// and starts again from the top: an infinite scroll that repeats its first
+// page forever.
+func lookupSortField(rv reflect.Value, column string) reflect.Value {
+	if f := rv.FieldByName(snakeToPascal(column)); f.IsValid() {
+		return f
+	}
+
+	parts := strings.Split(column, "_")
+	for split := len(parts) - 1; split >= 1; split-- {
+		outer := rv.FieldByName(snakeToPascal(strings.Join(parts[:split], "_")))
+		if !outer.IsValid() {
+			continue
+		}
+		if outer.Kind() == reflect.Ptr {
+			if outer.IsNil() {
+				return reflect.Value{}
+			}
+			outer = outer.Elem()
+		}
+		if outer.Kind() != reflect.Struct {
+			continue
+		}
+		if inner := outer.FieldByName(snakeToPascal(strings.Join(parts[split:], "_"))); inner.IsValid() {
+			return inner
+		}
+	}
+	return reflect.Value{}
 }
 
 // snakeToPascal turns "created_at" into "CreatedAt".

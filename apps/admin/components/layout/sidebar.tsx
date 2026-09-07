@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { resources } from "@/resources";
-import { getIcon, ChevronDown, LayoutDashboard } from "@/lib/icons";
+import { getIcon } from "@/lib/icons";
 import type { User } from "@repo/shared/types";
 
 // Theme toggle and user menu have moved to the topbar (Navbar component).

@@ -1,10 +1,10 @@
 {
+  "apps": {
+    "desktop": false,
+    "docs": false,
+    "expo": false
+  },
   "architecture": "triple",
   "frontend": "next",
-  "version": "3.180.0",
-  "apps": {
-    "expo": false,
-    "desktop": false,
-    "docs": false
-  }
+  "version": "3.192.0"
 }

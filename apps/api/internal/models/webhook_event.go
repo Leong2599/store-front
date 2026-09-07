@@ -19,10 +19,16 @@ import (
 //	failed    — handler returned an error; HandlerError holds the message
 //	skipped   — duplicate ExternalID — handler was bypassed
 type WebhookEvent struct {
-	ID         string `gorm:"primarykey;size:36" json:"id"`
-	Provider   string `gorm:"size:50;index;not null" json:"provider"`
-	EventType  string `gorm:"size:100;index" json:"event_type"`
-	ExternalID string `gorm:"size:255;index" json:"external_id"` // provider's event id
+	ID        string `gorm:"primarykey;size:36" json:"id"`
+	Provider  string `gorm:"size:50;not null;uniqueIndex:idx_webhook_provider_external,priority:1" json:"provider"`
+	EventType string `gorm:"size:100;index" json:"event_type"`
+
+	// ExternalID is the provider's own event id, and the second half of the
+	// idempotency key. A pointer because it has to be NULL when a provider
+	// does not supply one: every database allows repeated NULLs in a unique
+	// index and none allow a repeated empty string, so storing "" would make
+	// two unrelated anonymous events collide and silently drop the second.
+	ExternalID *string `gorm:"size:255;uniqueIndex:idx_webhook_provider_external,priority:2" json:"external_id,omitempty"`
 	// No explicit type: datatypes.JSON maps to jsonb on Postgres and json on
 	// MySQL by itself. Naming jsonb here fails AutoMigrate on MySQL, which has
 	// no such type.
@@ -41,10 +47,10 @@ func (w *WebhookEvent) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
-// Composite unique index on (provider, external_id) gives us
-// idempotent receipt: a duplicate delivery from the same provider
-// with the same event id fails the INSERT, which we treat as
-// "already processed".
-func (WebhookEvent) Indexes() string {
-	return "CREATE UNIQUE INDEX IF NOT EXISTS idx_webhook_events_provider_external_id ON webhook_events(provider, external_id) WHERE external_id <> ''"
-}
+// The unique index is declared on the fields above rather than built here.
+//
+// It used to live in a method returning DDL as a string, which nothing
+// called. The column had a plain index, the INSERT never failed, and the
+// handler's "duplicate means already processed" branch was unreachable: every
+// retried delivery ran the handler again. Declaring it as a tag means the
+// migration creates it, and the constraint is where it can be seen.

@@ -284,7 +284,7 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 				cfg.GORMStudioUsername: cfg.GORMStudioPassword,
 			})
 		}
-		studio.Mount(r, db, []interface{}{&models.User{}, &models.Upload{}, &models.Blog{}, &models.Country{}, &models.State{}, /* grit:studio */}, studioCfg)
+		studio.Mount(r, db, []interface{}{&models.User{}, &models.Upload{}, &models.Blog{}, /* grit:studio */}, studioCfg)
 		log.Println("GORM Studio mounted at /studio")
 	}
 
@@ -430,8 +430,6 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 	syncRegistry.Register("users", &models.User{})
 	syncRegistry.Register("uploads", &models.Upload{})
 	syncRegistry.Register("blogs", &models.Blog{})
-	syncRegistry.Register("countries", &models.Country{})
-	syncRegistry.Register("states", &models.State{})
 	// grit:sync
 	syncHandler := handlers.NewSyncHandler(db, syncRegistry)
 	// v3.31.68 — shared background CSV import status endpoint
@@ -455,12 +453,17 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 		log.Printf("saml: %v", err)
 	}
 	ssoHandler := handlers.NewSSOHandler(db, authService, cfg, ssoRegistry, samlRegistry)
-	countryHandler := &handlers.CountryHandler{
-		DB: db,
+	// The passkey relying party, built from the origins the frontends run
+	// on. No usable origin means no relying party, and every passkey route
+	// answers 501 rather than panicking: passkeys are optional, a broken
+	// boot is not.
+	passkeys, passkeyErr := services.NewPasskeys(db, cfg.AppName, cfg.CORSOrigins)
+	if passkeyErr != nil {
+		log.Printf("Passkeys disabled: %v", passkeyErr)
+		passkeys = nil
 	}
-	stateHandler := &handlers.StateHandler{
-		DB: db,
-	}
+	passkeyHandler := handlers.NewPasskeyHandler(db, passkeys, authHandler)
+
 	// grit:handlers
 
 	// Health check
@@ -637,6 +640,11 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 	{
 		auth.POST("/register", authHandler.Register)
 		auth.POST("/login", authHandler.Login)
+
+		// Passkey sign-in. Public because there is no session yet; the
+		// server-side challenge is what makes it safe.
+		auth.POST("/passkeys/login/begin", passkeyHandler.BeginLogin)
+		auth.POST("/passkeys/login/finish", passkeyHandler.FinishLogin)
 		auth.POST("/refresh", authHandler.Refresh)
 		auth.POST("/forgot-password", authHandler.ForgotPassword)
 		auth.POST("/reset-password", authHandler.ResetPassword)
@@ -797,24 +805,13 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 		// v3.31.68 — poll a background CSV import's progress/result.
 		protected.GET("/imports/:id", importJobHandler.GetByID)
 
-		protected.GET("/countries", countryHandler.List)
-		protected.GET("/countries/export", countryHandler.Export)
-		protected.POST("/countries/import", countryHandler.Import)
-		protected.GET("/countries/import/template", countryHandler.Template)
-		protected.GET("/countries/:id", countryHandler.GetByID)
-		protected.GET("/countries/:id/pdf", countryHandler.PDF)
-		protected.POST("/countries", countryHandler.Create)
-		protected.PUT("/countries/:id", countryHandler.Update)
-		protected.PATCH("/countries/:id", countryHandler.Patch)
-		protected.GET("/states", stateHandler.List)
-		protected.GET("/states/export", stateHandler.Export)
-		protected.POST("/states/import", stateHandler.Import)
-		protected.GET("/states/import/template", stateHandler.Template)
-		protected.GET("/states/:id", stateHandler.GetByID)
-		protected.GET("/states/:id/pdf", stateHandler.PDF)
-		protected.POST("/states", stateHandler.Create)
-		protected.PUT("/states/:id", stateHandler.Update)
-		protected.PATCH("/states/:id", stateHandler.Patch)
+		// Passkey management, on an account you are already signed in to.
+		protected.GET("/auth/passkeys", passkeyHandler.List)
+		protected.POST("/auth/passkeys/register/begin", passkeyHandler.BeginRegistration)
+		protected.POST("/auth/passkeys/register/finish", passkeyHandler.FinishRegistration)
+		protected.PATCH("/auth/passkeys/:id", passkeyHandler.Rename)
+		protected.DELETE("/auth/passkeys/:id", passkeyHandler.Delete)
+		
 		// grit:routes:protected
 	}
 
@@ -955,10 +952,6 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 		admin.PUT("/settings", settingsHandler.Update)
 		admin.DELETE("/settings/:key", settingsHandler.Reset)
 
-		admin.DELETE("/countries/:id", countryHandler.Delete)
-		admin.POST("/countries/bulk", countryHandler.Bulk)
-		admin.DELETE("/states/:id", stateHandler.Delete)
-		admin.POST("/states/bulk", stateHandler.Bulk)
 		// grit:routes:admin
 	}
 
@@ -973,6 +966,22 @@ func Setup(db *gorm.DB, cfg *config.Config, svc *Services) *gin.Engine {
 
 	// Custom role-restricted routes
 	// grit:routes:custom
+
+	// Every generated resource, each from its own <resource>_routes.go.
+	//
+	// A resource file registers itself from an init(), so this loop is the
+	// only place routes.go mentions them. Adding a resource does not edit
+	// this file, and neither does removing one.
+	mountResources(&Mount{
+		Engine:    r,
+		DB:        db,
+		Cfg:       cfg,
+		Svc:       svc,
+		V1:        v1,
+		Public:    publicAPI,
+		Protected: protected,
+		Admin:     admin,
+	})
 
 	mountLegacyAPIAlias(r)
 

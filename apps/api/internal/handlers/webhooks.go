@@ -78,10 +78,19 @@ func (h *WebhookHandler) Receive(c *gin.Context) {
 		return
 	}
 
+	// A provider that supplies no event id cannot be deduplicated, and every
+	// such delivery is a distinct row. NULL says that; "" would make two
+	// unrelated anonymous events collide on the unique index and drop the
+	// second one as a duplicate it is not.
+	var externalRef *string
+	if externalID != "" {
+		externalRef = &externalID
+	}
+
 	event := models.WebhookEvent{
 		Provider:   providerName,
 		EventType:  eventType,
-		ExternalID: externalID,
+		ExternalID: externalRef,
 		Payload:    datatypes.JSON(body),
 		Status:     "pending",
 	}

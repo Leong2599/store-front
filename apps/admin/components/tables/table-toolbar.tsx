@@ -2,10 +2,9 @@
 
 import { useState } from "react";
 import type { ResourceDefinition, ColumnDefinition } from "@/lib/resource";
-import { Search, Plus, Download, Upload, Columns3 } from "@/lib/icons";
+import { Search, Plus, Upload, Columns3 } from "@/lib/icons";
 import { DateFilter, type DateRange } from "./date-filter";
 import { ExportMenu } from "./export-menu";
-import { exportToFile } from "@/lib/excel-utils";
 import { buttonClasses } from "@/components/ui/button";
 
 interface TableToolbarProps {
@@ -37,8 +36,6 @@ export function TableToolbar({
   resource,
   search,
   onSearch,
-  selectedCount,
-  onBulkDelete,
   onCreate,
   allColumns,
   hiddenColumns,

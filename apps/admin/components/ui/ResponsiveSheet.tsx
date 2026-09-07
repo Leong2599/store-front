@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { X } from "@/lib/icons";
 

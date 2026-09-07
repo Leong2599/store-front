@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useUploads, useUploadFile, useDeleteUpload, useUploadStats } from "@/hooks/use-system";
-import { FolderOpen, Upload, Trash2, Loader2, X, Image as ImageIcon, Play, Music, FileText, FileSpreadsheet, File as FileIcon } from "@/lib/icons";
+import { FolderOpen, Upload, Loader2, X, Image as ImageIcon, Play, Music, FileText, FileSpreadsheet, File as FileIcon } from "@/lib/icons";
 import { buttonClasses } from "@/components/ui/button";
 
 function formatFileSize(bytes: number): string {

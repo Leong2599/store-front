@@ -5,6 +5,7 @@ import type { FieldDefinition, FormDefinition } from "@/lib/resource";
 import { TextField } from "./fields/text-field";
 import { TextareaField } from "./fields/textarea-field";
 import { NumberField } from "./fields/number-field";
+import { MoneyField } from "./fields/money-field";
 import { SelectField } from "./fields/select-field";
 import { DateField } from "./fields/date-field";
 import { ToggleField } from "./fields/toggle-field";
@@ -137,6 +138,17 @@ export function FieldRenderer({
           rules={field.required ? { required: `${field.label} is required` } : undefined}
           render={({ field: formField }) => (
             <NumberField field={field} value={formField.value ?? ""} onChange={formField.onChange} error={error} onGenerate={makeGenerate(formField.onChange)} />
+          )}
+        />
+      );
+    case "money":
+      return (
+        <Controller
+          name={field.key}
+          control={control}
+          rules={field.required ? { required: `${field.label} is required` } : undefined}
+          render={({ field: formField }) => (
+            <MoneyField field={field} value={formField.value ?? null} onChange={formField.onChange} error={error} />
           )}
         />
       );

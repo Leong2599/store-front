@@ -6,10 +6,6 @@ import (
 	"strings"
 
 	"gorm.io/gorm"
-
-	"encoding/json"
-
-	"store-front/apps/api/internal/models"
 )
 
 // SharedResourceSubmission is the result of a public form submission —
@@ -32,28 +28,6 @@ type SharedResourceSubmission struct {
 // the parameter is named "fields" rather than "body".
 func SubmitSharedForm(db *gorm.DB, resourceName string, fields map[string]interface{}) (*SharedResourceSubmission, error) {
 	switch resourceName {
-	case "Country":
-		item := &models.Country{}
-		body, _ := json.Marshal(fields)
-		if err := json.Unmarshal(body, item); err != nil {
-			return nil, fmt.Errorf("decoding Country body: %w", err)
-		}
-		if err := db.Create(item).Error; err != nil {
-			return nil, fmt.Errorf("creating Country: %w", err)
-		}
-		return &SharedResourceSubmission{ID: item.ID, Label: item.Name}, nil
-
-	case "State":
-		item := &models.State{}
-		body, _ := json.Marshal(fields)
-		if err := json.Unmarshal(body, item); err != nil {
-			return nil, fmt.Errorf("decoding State body: %w", err)
-		}
-		if err := db.Create(item).Error; err != nil {
-			return nil, fmt.Errorf("creating State: %w", err)
-		}
-		return &SharedResourceSubmission{ID: item.ID, Label: item.Name}, nil
-
 	// grit:form-share:dispatch
 	default:
 		return nil, fmt.Errorf("public submission disabled for %q (no dispatch case registered)", resourceName)
@@ -101,12 +75,6 @@ func RegisteredResources() []string {
 // marker comment inside the switch.
 func PublicFields(resourceName string) []PublicFieldInfo {
 	switch resourceName {
-	case "Country":
-		return reflectPublicFields(&models.Country{})
-
-	case "State":
-		return reflectPublicFields(&models.State{})
-
 	// grit:form-share:fields
 	default:
 		return nil

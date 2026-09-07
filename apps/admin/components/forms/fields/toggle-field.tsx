@@ -1,3 +1,4 @@
+import { useId } from "react";
 import type { FieldDefinition } from "@/lib/resource";
 
 interface ToggleFieldProps {
@@ -8,13 +9,17 @@ interface ToggleFieldProps {
 }
 
 export function ToggleField({ field, value, onChange, error }: ToggleFieldProps) {
+  const labelId = useId();
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <label className="text-sm font-medium text-foreground">{field.label}</label>
+        <label id={labelId} className="text-sm font-medium text-foreground">{field.label}</label>
         <button
           type="button"
           onClick={() => onChange(!value)}
+          role="switch"
+          aria-checked={value}
+          aria-labelledby={labelId}
           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
             value ? "bg-accent" : "bg-bg-hover"
           }`}

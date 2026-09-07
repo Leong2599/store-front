@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, ExternalLink, AlertTriangle, Cpu, Database, Zap } from "@/lib/icons";
+import { Activity, ExternalLink, AlertTriangle, Zap } from "@/lib/icons";
 import { apiClient as api } from "@/lib/api-client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";

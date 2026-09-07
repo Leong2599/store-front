@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useJobStats, useJobsByStatus, useRetryJob, useClearQueue } from "@/hooks/use-system";
-import { Briefcase, RefreshCw, Trash2, Loader2, AlertCircle } from "@/lib/icons";
+import { Briefcase, RefreshCw, Trash2, Loader2 } from "@/lib/icons";
 
 const statuses = ["active", "pending", "completed", "failed", "retry"] as const;
 

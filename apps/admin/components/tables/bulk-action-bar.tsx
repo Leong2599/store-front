@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import type { ResourceDefinition, CustomBulkAction } from "@/lib/resource";
+import type { CustomBulkAction } from "@/lib/resource";
 import { getIcon, Archive, ArchiveRestore, Download, Pencil, Trash2, X } from "@/lib/icons";
 
 /*
